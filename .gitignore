@@ -1,0 +1,19 @@
+# 실행 중 생성되는 기기 설정 (환경마다 다름)
+device.json
+
+# 예전 버전이 만들던 파일 — 개인정보가 들어가던 파일이라 절대 올리지 않는다
+settings.json
+
+# 테스트용 라벨 사진
+test_label.jpg
+
+# 파이썬
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
