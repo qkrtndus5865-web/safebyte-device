@@ -184,12 +184,13 @@ body{
 .btn.warn{ background:var(--danger-soft); color:var(--danger);
            border:1px solid var(--danger); }
 
-/* ── 설정(내 기준) 화면 ────────────────────────────────────────── */
-#screen-prefs{ padding:4px 32px 18px; }
-.prefs-wrap{ height:100%; display:flex; flex-direction:column; }
-.prefs-head h2{ font-size:24px; font-weight:800; letter-spacing:-.4px; }
-.prefs-head p{ font-size:13.5px; color:var(--ink-3); margin-top:5px; line-height:1.55; }
-.prefs-body{ flex:1; overflow-y:auto; margin-top:12px; padding-right:6px; }
+/* ── 카트 연결 화면 ────────────────────────────────────────── */
+#screen-pair{ padding:8px 32px 16px; }
+.prefs-wrap{ height:100%; width:100%; max-width:560px; margin:0 auto;
+  display:flex; flex-direction:column; justify-content:center; }
+.prefs-head h2{ font-size:21px; font-weight:800; letter-spacing:-.4px; }
+.prefs-head p{ font-size:13px; color:var(--ink-3); margin-top:5px; line-height:1.55; }
+.prefs-body{ flex:0 1 auto; overflow-y:auto; margin-top:10px; padding-right:6px; }
 
 .banner{ background:var(--blue-soft); border:1px solid #cfdcff;
   border-radius:14px; padding:11px 14px; font-size:13px; color:#2c4fb8;
@@ -245,7 +246,8 @@ body{
   padding:9px 17px; font-size:13.5px; font-weight:700; cursor:pointer; }
 .seg button.on{ background:var(--ink); color:#fff; }
 
-.prefs-foot{ display:flex; gap:9px; padding-top:10px; }
+.prefs-foot{ display:flex; gap:9px; padding-top:12px; justify-content:center; }
+.prefs-foot .btn{ flex:none; min-width:180px; }
 .msg{ font-size:13px; font-weight:700; margin-top:8px; min-height:18px; }
 .msg.ok{ color:var(--safe); }
 .msg.err{ color:var(--danger); }
@@ -253,631 +255,254 @@ body{
 .hide{ display:none !important; }
 </style>
 </head>
+
 <body>
 <div class="stage" id="stage">
-
   <svg class="arc" viewBox="0 0 380 700" fill="none" aria-hidden="true">
     <path d="M380 40 C 190 210, 190 490, 380 660" stroke="#e6e8ec" stroke-width="2"/>
   </svg>
 
-  <!-- 상단 바 -->
   <div class="topbar">
     <div class="wordmark">Safe<b>·</b>Byte</div>
     <div class="spacer"></div>
-    <!-- ★ 지금 누구 기준으로 동작 중인지 / 눌러서 사용 종료 -->
-    <div class="pill guest" id="sessionPill">공용 모드</div>
+    <div class="pill guest" id="cartPill">연결 안 됨</div>
     <div class="pill" id="hwPill"><span class="led"></span><span id="hwText">확인 중</span></div>
     <div class="pill" id="netPill"><span class="led"></span><span id="netText">서버</span></div>
-    <div class="icon-btn" id="btnPrefs" title="내 기준">
+    <div class="icon-btn" id="btnPair" title="카트 연결">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
            stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><rect x="4" y="7" width="16" height="13" rx="2"/><path d="M9 12h6"/>
       </svg>
     </div>
   </div>
 
-  <!-- ══════════════ 화면 1 : 스캔 ══════════════ -->
   <section class="screen on" id="screen-scan">
-
-    <!-- 대기 -->
     <div class="view on" id="v-idle">
       <div class="badge float">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#b06bff" stroke-width="1.6"
-             stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#b06bff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.2l1-1.6A1 1 0 0 1 8.6 4h6.8a1 1 0 0 1 .9.4L17.3 6h1.2A2.5 2.5 0 0 1 21 8.5V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
           <circle cx="12" cy="12.5" r="3.4"/>
         </svg>
       </div>
       <div class="title" id="idleTitle">라벨을 스캔하세요</div>
       <div class="sub">제품 뒷면의 원재료명 부분을 화면에 맞추고<br>손잡이의 버튼을 눌러 주세요</div>
-      <div class="tips">
-        <span class="tip">흔들림 없이</span>
-        <span class="tip">라벨 정면</span>
-        <span class="tip">그림자 적게</span>
-      </div>
+      <div class="tips"><span class="tip">흔들림 없이</span><span class="tip">라벨 정면</span><span class="tip">그림자 적게</span></div>
       <div class="criteria" id="criteriaBar"></div>
     </div>
 
-    <!-- ★ 기준이 없어서 판정하지 않은 경우 -->
-    <div class="view" id="v-setup">
-      <div class="badge" style="background:var(--caution-soft); box-shadow:inset 0 0 0 2px var(--caution)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#e08a00" stroke-width="1.7"
-             stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3l8 3v6c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V6z"/>
-          <path d="M12 9.5v3.5"/>
-          <circle cx="12" cy="16" r=".7" fill="#e08a00" stroke="none"/>
+    <div class="view" id="v-pair">
+      <div class="badge" style="background:var(--accent-soft); box-shadow:inset 0 0 0 2px var(--accent)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#7b3fd1" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="7" width="16" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M9 12h6"/>
         </svg>
       </div>
-      <div class="title">아직 판정할 기준이 없어요</div>
-      <div class="sub">
-        무엇을 가려야 하는지 모르면 안전한지도 알려드릴 수 없습니다.<br>
-        가리는 성분을 먼저 골라 주세요.
-      </div>
+      <div class="title">카트를 연결해 주세요</div>
+      <div class="sub">휴대폰 앱에서 이 카트를 연결하면 나의 알레르기·식단 기준으로 검사합니다.<br>앱에서 받은 <b>연결 코드</b>를 입력하세요.</div>
+      <div class="actions" style="max-width:440px"><button class="btn accent" id="btnGoPair">연결 코드 입력하기</button></div>
+    </div>
+
+    <div class="view" id="v-preview">
+      <div class="title">라벨을 맞춰 주세요</div>
+      <img id="previewImg" alt="미리보기" style="max-width:min(58%,400px); max-height:46vh; object-fit:contain; border-radius:16px; box-shadow:var(--shadow-lg); margin:10px 0; background:#000">
+      <div class="sub">원재료명이 화면에 잘 보이면 버튼을 <b>한 번 더</b> 눌러 촬영하세요</div>
       <div class="actions" style="max-width:440px">
-        <button class="btn accent" id="btnGoSetup">내 기준 설정하기</button>
+        <button class="btn accent" id="btnCapture">이 화면으로 촬영</button>
+        <button class="btn ghost" id="btnCancelPreview">취소</button>
       </div>
     </div>
 
-    <!-- 촬영중 / 분석중 -->
     <div class="view" id="v-busy">
       <div class="spinner"></div>
       <div class="title" id="busyTitle">촬영 중</div>
       <div class="sub" id="busySub">잠시만 기다려 주세요</div>
     </div>
 
-    <!-- 결과 -->
     <div class="view" id="v-result">
       <div class="result-head">
-        <div class="badge">
-          <svg id="rIcon" viewBox="0 0 24 24" fill="none" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round"></svg>
-        </div>
-        <div>
-          <span class="level-tag" id="rTag">SAFE</span>
-          <div class="verdict" id="rTitle">현재 기준 통과</div>
-          <div class="verdict-sub" id="rSub"></div>
-        </div>
+        <div class="badge"><svg id="rIcon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg></div>
+        <div><span class="level-tag" id="rTag">SAFE</span><div class="verdict" id="rTitle">현재 기준 통과</div><div class="verdict-sub" id="rSub"></div></div>
       </div>
-
       <div class="applied" id="rApplied"></div>
       <div class="counts" id="rCounts"></div>
       <div class="detail" id="rDetail"></div>
-
       <div class="actions">
         <button class="btn ghost" id="btnToggleDetail">세부 설명 보기</button>
         <button class="btn primary" id="btnAgain">다른 라벨 확인</button>
       </div>
     </div>
 
-    <!-- 오류 -->
     <div class="view" id="v-error">
-      <div class="badge">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#9aa0aa" stroke-width="1.8"
-             stroke-linecap="round">
-          <circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/>
-          <circle cx="12" cy="16.6" r=".7" fill="#9aa0aa"/>
-        </svg>
-      </div>
+      <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="#9aa0aa" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><circle cx="12" cy="16.6" r=".7" fill="#9aa0aa"/></svg></div>
       <div class="title">문제가 생겼어요</div>
       <div class="sub" id="errSub"></div>
-      <div class="actions" style="max-width:400px">
-        <button class="btn primary" id="btnRetry">다시 시도</button>
-      </div>
+      <div class="actions" style="max-width:400px"><button class="btn primary" id="btnRetry">다시 시도</button></div>
     </div>
   </section>
 
-  <!-- ══════════════ 화면 2 : 내 기준 ══════════════ -->
-  <section class="screen" id="screen-prefs">
+  <section class="screen" id="screen-pair">
     <div class="prefs-wrap">
       <div class="prefs-head">
-        <h2>먹기 전에 확인할 기준</h2>
-        <p>결과는 여기서 고른 기준에 맞춰 위험 성분을 먼저 보여줍니다.</p>
+        <h2>카트 연결</h2>
+        <p>휴대폰 앱에서 카트를 연결하면 표시되는 <b>연결 코드</b>를 입력하세요. 연결하면 앱에 설정한 알레르기·식단 기준으로 검사합니다.</p>
       </div>
-
       <div class="prefs-body">
-        <!-- ★ 공용 기기 안내 -->
-        <div class="banner" id="sessionBanner"></div>
-
-        <div class="field">
-          <label>이름 또는 닉네임 (선택)</label>
-          <input id="inName" type="text" placeholder="예: 손님">
+        <div class="banner" id="pairBanner"></div>
+        <div id="pairInputBox">
+          <div class="field"><label>연결 코드</label><input id="inCode" type="text" placeholder="앱에서 받은 코드를 입력" autocomplete="off"></div>
+          <button class="btn accent" id="btnPairSubmit" style="width:100%">연결하기</button>
+          <div class="note">연결 코드는 앱에서 발급하며 5분간만 유효합니다. 이 기기에는 비밀번호가 저장되지 않고, 사용을 종료하면 연결이 즉시 끊깁니다.</div>
         </div>
-
-        <div id="baseCards"></div>
-
-        <div class="sub-head">
-          <b>내 알레르기 기준</b>
-          <span class="cnt" id="algCount">0개</span>
+        <div id="pairedBox" class="hide">
+          <div class="field"><label>연결된 카트</label><div id="cartName" style="font-size:16px; margin-top:3px; font-weight:800"></div></div>
+          <div class="sub-head"><b>적용 중인 기준</b></div>
+          <div class="chips" id="pairProfiles"></div>
+          <div class="sub-head"><b>사용 종료</b></div>
+          <div class="note" style="margin-top:0">쇼핑이 끝나면 눌러 주세요. 이 카트와의 연결이 즉시 끊기고 기준이 지워집니다.</div>
+          <button class="btn warn" id="btnEndPair" style="width:100%; margin-top:9px">연결 끊고 사용 종료</button>
         </div>
-        <div class="field">
-          <label>검색</label>
-          <input id="inSearch" type="text" placeholder="예: 우유, milk, 해산물, 돼지고기">
-        </div>
-        <div class="tabs" id="catTabs"></div>
-        <div class="bundles" id="bundleRow"></div>
-        <div class="chips" id="algChips"></div>
-        <div class="note">
-          개별 항목을 하나도 고르지 않고 위의 <b>알레르기 전체</b>만 켜면
-          국내 표시 대상 알레르기 유발물질 전체를 검사합니다.
-        </div>
-
-        <!-- ★ 사용 종료 -->
-        <div class="sub-head"><b>사용 종료</b></div>
-        <div class="note" style="margin-top:0">
-          쇼핑이 끝나면 반드시 눌러 주세요. 여기에 입력한 기준과 이름이
-          기기에서 즉시 지워집니다. 누르지 않아도
-          <b id="timeoutMin">15</b>분 동안 조작이 없으면 자동으로 지워집니다.
-        </div>
-        <button class="btn warn" id="btnEndSession"
-                style="width:100%; margin-top:9px">내 정보 지우고 사용 종료</button>
-
-        <!-- OCR 모드 (기기 설정) -->
-        <div class="sub-head"><b>OCR 모드 <span style="font-weight:600;color:var(--ink-3);font-size:12px">· 기기 설정</span></b></div>
-        <div class="seg" id="ocrSeg">
-          <button data-mode="mock">Mock (무료 테스트)</button>
-          <button data-mode="live">CLOVA (실제 촬영)</button>
-        </div>
-        <div class="note">
-          OCR(광학 문자 인식) = 사진 속 글자를 텍스트로 바꾸는 기능.
-          Mock은 실제 호출 없이 아래 문구로 판정 로직만 시험하므로 요금이 들지 않습니다.
-          이 항목은 개인정보가 아니라 기기 설정이라 전원을 껐다 켜도 유지됩니다.
-        </div>
-        <div class="field" id="mockField" style="margin-top:9px">
-          <label>Mock 테스트 문구</label>
-          <textarea id="inMock" rows="4"></textarea>
-        </div>
-
-        <!-- 계정 연동 -->
-        <div class="sub-head"><b>앱 계정에서 기준 가져오기 (선택)</b></div>
-        <div class="note" style="margin-top:0">
-          로그인하면 휴대폰 앱에서 설정한 기준을 이번 쇼핑 동안만 빌려옵니다.
-          로그인 정보는 기기에 저장되지 않고, 사용 종료 시 함께 지워집니다.
-        </div>
-        <div id="loginBox" style="margin-top:9px">
-          <div class="field"><label>이메일</label>
-            <input id="inEmail" type="email" placeholder="you@example.com"></div>
-          <div class="field"><label>비밀번호</label>
-            <input id="inPw" type="password" placeholder="6자 이상"></div>
-          <button class="btn accent" id="btnLogin" style="width:100%">로그인해서 기준 가져오기</button>
-        </div>
-        <div id="logoutBox" class="hide">
-          <div class="field"><label>로그인됨</label>
-            <div id="loggedEmail" style="font-size:15px; margin-top:3px"></div></div>
-          <button class="btn ghost" id="btnLogout" style="width:100%">로그아웃</button>
-        </div>
-
-        <div class="msg" id="prefMsg"></div>
+        <div class="msg" id="pairMsg"></div>
       </div>
-
-      <div class="prefs-foot">
-        <button class="btn ghost" id="btnBack">돌아가기</button>
-        <button class="btn primary" id="btnSave">이 기준으로 시작</button>
-      </div>
+      <div class="prefs-foot"><button class="btn ghost" id="btnBack">돌아가기</button></div>
     </div>
   </section>
 </div>
 
 <script>
-/* ═══════════════════════════════════════════════════════════════════
-   1. 상수
-   ═══════════════════════════════════════════════════════════════════ */
 const LEVELS = {
-  SAFE:    { icon:'<path d="M20 6 9 17l-5-5"/>' },
-  CAUTION: { icon:'<path d="M12 3 2 20h20z"/><path d="M12 10v4"/>'
-                 + '<circle cx="12" cy="17.4" r=".7" fill="currentColor" stroke="none"/>' },
-  DANGER:  { icon:'<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/>' },
+  SAFE:{icon:'<path d="M20 6 9 17l-5-5"/>'},
+  CAUTION:{icon:'<path d="M12 3 2 20h20z"/><path d="M12 10v4"/><circle cx="12" cy="17.4" r=".7" fill="currentColor" stroke="none"/>'},
+  DANGER:{icon:'<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/>'},
 };
-const BASE_ICONS = {
-  halal:  '<path d="M12 3v18M5 8h14M7 3v5M17 3v5"/>',
-  vegan:  '<path d="M11 20A7 7 0 0 1 4 13c0-5 4-9 9-9h7v7a9 9 0 0 1-9 9z"/><path d="M8 17c2-4 5-6 9-7"/>',
-  allergy:'<path d="M12 3l8 3v6c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V6z"/><path d="M12 9v4"/><circle cx="12" cy="16" r=".7" fill="currentColor" stroke="none"/>',
-};
-
-const $ = (id) => document.getElementById(id);
+const $ = (id)=>document.getElementById(id);
 const stage = $('stage');
-const views = {
-  IDLE:       $('v-idle'),
-  NEED_SETUP: $('v-setup'),
-  CAPTURING:  $('v-busy'),
-  ANALYZING:  $('v-busy'),
-  RESULT:     $('v-result'),
-  ERROR:      $('v-error'),
-};
+const views = {IDLE:$('v-idle'), NEED_PAIR:$('v-pair'), PREVIEW:$('v-preview'), CAPTURING:$('v-busy'), ANALYZING:$('v-busy'), RESULT:$('v-result'), ERROR:$('v-error')};
+let CONFIG=null, LABELS={};
+let PAIR={active:false, cart_name:'', profiles:[]};
+let lastVersion=-1, lastPairKey='', showDetail=false;
 
-let CONFIG = null;          // /config 응답 (선택지 카탈로그 + 기기 설정)
-let SESSION = {active:false, profiles:[], display_name:'', logged_in:false};
-let selected = new Set();   // 설정 화면에서 고르는 중인 토큰들
-let category = '전체';
-let search = '';
-let ocrMode = 'mock';
-let lastVersion = -1;
-let lastSessionKey = '';    // 세션이 바뀌었는지 판단용
-let showDetail = false;
-
-/* ═══════════════════════════════════════════════════════════════════
-   2. 스캔 화면
-   ═══════════════════════════════════════════════════════════════════ */
-function showView(status){
-  for(const v of new Set(Object.values(views))) v.classList.remove('on');
-  (views[status] || views.IDLE).classList.add('on');
-}
+function showView(status){ for(const v of new Set(Object.values(views))) v.classList.remove('on'); (views[status]||views.IDLE).classList.add('on'); }
+function labelOf(t){ return LABELS[t] || t.replace('allergy:',''); }
 
 function detCard(d, kind){
-  const tag = kind === 'facility' ? 'facility' : 'direct';
-  const label = esc(d.label || (kind === 'facility' ? '제조시설 공유' : '직접 함유'));
-  let html = '<div class="det"><div class="row">'
-           + '<span class="nm">' + esc(d.name) + '</span>'
-           + '<span class="tag ' + tag + '">' + label + '</span>'
-           + '<span class="kw">' + esc(d.keyword) + '</span></div>';
-  if(showDetail){
-    if(d.reason)   html += '<div class="why">' + esc(d.reason) + '</div>';
-    if(d.evidence) html += '<div class="ev">라벨 문구: ' + esc(d.evidence) + '</div>';
-  }
-  return html + '</div>';
+  const tag = kind==='facility'?'facility':'direct';
+  const label = esc(d.label || (kind==='facility'?'제조시설 공유':'직접 함유'));
+  let html = '<div class="det"><div class="row"><span class="nm">'+esc(d.name)+'</span><span class="tag '+tag+'">'+label+'</span><span class="kw">'+esc(d.keyword)+'</span></div>';
+  if(showDetail){ if(d.reason) html+='<div class="why">'+esc(d.reason)+'</div>'; if(d.evidence) html+='<div class="ev">라벨 문구: '+esc(d.evidence)+'</div>'; }
+  return html+'</div>';
 }
-
-function tile(label, value){
-  return '<div class="count"><span>' + esc(label) + '</span><strong>'
-       + esc(value) + '</strong></div>';
-}
+function tile(l,v){ return '<div class="count"><span>'+esc(l)+'</span><strong>'+esc(v)+'</strong></div>'; }
 
 function renderResult(s){
-  const lv = LEVELS[s.level] || LEVELS.SAFE;
-  stage.setAttribute('data-level', s.level || 'SAFE');
-  $('rTag').textContent   = s.level || 'SAFE';
-  $('rTitle').textContent = s.title || '';
-  $('rSub').textContent   = s.subtitle || '';
-  $('rIcon').innerHTML    = lv.icon;
-  $('rIcon').style.stroke = 'var(--main)';
-
-  /* ★ 어떤 기준으로 검사했는지 — 앞사람 기준이 남아 잘못 판정한 경우를
-     사용자가 바로 알아챌 수 있도록 결과 화면에 항상 붙여 둔다 */
-  $('rApplied').innerHTML = '<span class="lb">적용된 내 기준</span>'
-    + (s.applied || []).map(a => '<span class="mini">' + esc(a) + '</span>').join('');
-
-  $('rCounts').innerHTML =
-      tile('직접 함유', (s.direct || []).length + '건')
-    + tile('제조시설 공유', (s.facility || []).length + '건')
-    + tile('OCR', s.ocr_provider || '-')
-    + tile('Cache', s.cache_label || '-')
-    + (s.paid ? tile('유료 호출', '있음') : '');
-
-  let html = '';
-  if(s.summary) html += '<div class="summary-line">' + esc(s.summary) + '</div>';
-  if((s.direct || []).length){
-    html += '<div class="sec-title">직접 함유로 확인된 성분</div>'
-          + s.direct.map(d => detCard(d, 'direct')).join('');
-  }
-  if((s.facility || []).length){
-    html += '<div class="sec-title">제조시설 공유 표기 (직접 함유 아님)</div>'
-          + s.facility.map(d => detCard(d, 'facility')).join('');
-  }
-  if(!(s.direct || []).length && !(s.facility || []).length){
-    html += '<div class="sec-title">감지된 성분</div>'
-          + '<div class="det"><div class="why">선택한 기준에 해당하는 성분이 '
-          + '라벨에서 발견되지 않았습니다.</div></div>';
-  }
-  if(showDetail && s.ocr_text){
-    html += '<div class="sec-title">라벨에서 읽은 원문</div>'
-          + '<div class="ocrbox">' + esc(s.ocr_text) + '</div>';
-  }
+  const lv = LEVELS[s.level]||LEVELS.SAFE;
+  stage.setAttribute('data-level', s.level||'SAFE');
+  $('rTag').textContent = s.needs_review ? '확인 필요' : (s.level||'SAFE');
+  $('rTitle').textContent = s.title||''; $('rSub').textContent = s.subtitle||'';
+  $('rIcon').innerHTML = lv.icon; $('rIcon').style.stroke='var(--main)';
+  $('rApplied').innerHTML = '<span class="lb">적용된 기준</span>'+(s.applied||[]).map(a=>'<span class="mini">'+esc(a)+'</span>').join('');
+  $('rCounts').innerHTML = tile('직접 함유',(s.direct||[]).length+'건')+tile('제조시설 공유',(s.facility||[]).length+'건')+tile('OCR',s.ocr_provider||'-')+tile('Cache',s.cache_label||'-')+(s.paid?tile('유료 호출','있음'):'');
+  let html='';
+  if(s.needs_review) html+='<div class="crit-warn" style="margin-bottom:9px">라벨을 충분히 읽지 못했습니다. <b>안전하다고 볼 수 없으니</b> 밝은 곳에서 다시 촬영해 주세요.</div>';
+  if(s.summary) html+='<div class="summary-line">'+esc(s.summary)+'</div>';
+  if((s.direct||[]).length) html+='<div class="sec-title">직접 함유로 확인된 성분</div>'+s.direct.map(d=>detCard(d,'direct')).join('');
+  if((s.facility||[]).length) html+='<div class="sec-title">제조시설 공유 표기 (직접 함유 아님)</div>'+s.facility.map(d=>detCard(d,'facility')).join('');
+  if(!(s.direct||[]).length && !(s.facility||[]).length) html+='<div class="sec-title">감지된 성분</div><div class="det"><div class="why">선택한 기준에 해당하는 성분이 라벨에서 발견되지 않았습니다.</div></div>';
+  if(showDetail && s.ocr_text) html+='<div class="sec-title">라벨에서 읽은 원문</div><div class="ocrbox">'+esc(s.ocr_text)+'</div>';
   $('rDetail').innerHTML = html;
-  $('btnToggleDetail').textContent = showDetail ? '간단히 보기' : '세부 설명 보기';
+  $('btnToggleDetail').textContent = showDetail?'간단히 보기':'세부 설명 보기';
 }
 
 function render(s){
-  // 세션(사용 중인 사람)은 서버가 자동으로 끊을 수 있으므로 매번 반영
-  applySession(s.session);
-
-  if(s.version === lastVersion) return;   // 나머지는 바뀐 것만 다시 그린다
-  lastVersion = s.version;
-  showDetail = false;
-
-  if(s.status === 'CAPTURING' || s.status === 'ANALYZING'){
-    $('busyTitle').textContent = s.status === 'CAPTURING' ? '촬영 중' : '분석 중';
-    $('busySub').textContent   = s.status === 'CAPTURING'
-        ? '라벨을 찍고 있어요' : '성분을 확인하고 있어요';
-  }
-  if(s.status === 'RESULT') renderResult(s);
-  if(s.status === 'ERROR')  $('errSub').textContent = s.message || '다시 시도해 주세요';
-
-  if(s.status !== 'IDLE') switchScreen('scan');
+  applyPairing(s.pairing);
+  if(s.version===lastVersion) return;
+  lastVersion=s.version; showDetail=false;
+  if(s.status==='CAPTURING'||s.status==='ANALYZING'){ $('busyTitle').textContent=s.status==='CAPTURING'?'촬영 중':'분석 중'; $('busySub').textContent=s.status==='CAPTURING'?'라벨을 찍고 있어요':'성분을 확인하고 있어요'; }
+  if(s.status==='RESULT') renderResult(s);
+  if(s.status==='ERROR') $('errSub').textContent=s.message||'다시 시도해 주세요';
+  // 미리보기 스트림: PREVIEW 상태에서만 <img src="/preview"> 를 켠다(벗어나면 끊어 카메라 부담↓)
+  const pv=$('previewImg');
+  if(s.status==='PREVIEW'){ if(!((pv.getAttribute('src')||'').includes('/preview'))) pv.src='/preview?t='+Date.now(); }
+  else if(pv.getAttribute('src')){ pv.removeAttribute('src'); }
+  if(s.status!=='IDLE') switchScreen('scan');
   showView(s.status);
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   3. ★ 세션 표시 — 공용 기기이므로 항상 눈에 보이게
-   ═══════════════════════════════════════════════════════════════════ */
-function applySession(sess){
-  if(!sess) return;
-  const key = JSON.stringify([sess.active, sess.profiles, sess.display_name, sess.logged_in]);
-  const changed = key !== lastSessionKey;
-  lastSessionKey = key;
-  SESSION = sess;
-
-  // 상단 배지
-  const pill = $('sessionPill');
-  if(sess.active){
-    pill.className = 'pill user';
-    pill.textContent = (sess.display_name || '사용 중') + ' · 사용 종료 ✕';
-  }else{
-    pill.className = 'pill guest';
-    pill.textContent = '공용 모드';
-  }
-
-  if(changed){
-    renderCriteriaBar();
-    // 세션이 끊겼는데 설정 화면에서 뭔가 고르던 중이면 화면 선택도 비운다
-    if(!sess.active && $('screen-prefs').classList.contains('on')){
-      selected = new Set(); syncBaseCards(); renderChips();
-    }
-    if(sess.active) selected = new Set(sess.profiles);
-  }
+function applyPairing(p){
+  if(!p) return;
+  const key=JSON.stringify([p.active,p.cart_name,p.profiles]);
+  const changed=key!==lastPairKey; lastPairKey=key; PAIR=p;
+  const pill=$('cartPill');
+  if(p.active){ pill.className='pill user'; pill.textContent=(p.cart_name||'연결됨')+' · 종료 ✕'; }
+  else { pill.className='pill guest'; pill.textContent='연결 안 됨'; }
+  if(changed){ renderCriteriaBar(); if($('screen-pair').classList.contains('on')) renderPairScreen(); }
 }
-
-/* 대기화면 아래 — 지금 적용 중인 기준 */
 function renderCriteriaBar(){
-  if(!CONFIG) return;
-  const bar = $('criteriaBar');
-  if(SESSION.active && SESSION.profiles.length){
-    const items = SESSION.profiles.slice(0, 12).map(t =>
-      '<span class="mini">' + esc(labelOf(t)) + '</span>').join('');
-    const more = SESSION.profiles.length > 12
-      ? '<span class="mini">외 ' + (SESSION.profiles.length - 12) + '개</span>' : '';
-    bar.innerHTML = '<div class="crit-row">' + items + more + '</div>';
-    $('idleTitle').textContent = '라벨을 스캔하세요';
-  }else{
-    bar.innerHTML =
-      '<div class="crit-warn">이 기기는 <b>여러 사람이 함께 쓰는 카트</b>라 '
-      + '앞사람의 기준을 남겨 두지 않습니다.<br>'
-      + '가리는 성분을 골라야 판정할 수 있어요. 오른쪽 위 톱니바퀴를 눌러 주세요.</div>';
-    $('idleTitle').textContent = '내 기준을 설정해 주세요';
+  const bar=$('criteriaBar');
+  if(PAIR.active && PAIR.profiles.length){
+    bar.innerHTML='<div class="crit-row">'+PAIR.profiles.slice(0,12).map(t=>'<span class="mini">'+esc(labelOf(t))+'</span>').join('')+(PAIR.profiles.length>12?'<span class="mini">외 '+(PAIR.profiles.length-12)+'개</span>':'')+'</div>';
+    $('idleTitle').textContent='라벨을 스캔하세요';
+  } else {
+    bar.innerHTML='<div class="crit-warn">이 카트는 아직 연결되지 않았습니다. 오른쪽 위 버튼을 눌러 <b>앱의 연결 코드</b>를 입력해 주세요.</div>';
+    $('idleTitle').textContent='카트를 연결해 주세요';
   }
 }
 
-function labelOf(t){
-  const base = (CONFIG.base_profiles || []).find(p => p.token === t);
-  if(base) return base.label;
-  const c = (CONFIG.choices || []).find(x => x.token === t);
-  return c ? c.label : t.replace('allergy:', '');
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   4. 서버 통신
-   ═══════════════════════════════════════════════════════════════════ */
 async function poll(){
-  try{
-    const r = await fetch('/state', {cache:'no-store'});
-    const s = await r.json();
-    setPill($('netPill'), $('netText'), true, '서버 연결됨');
-    render(s);
-  }catch(e){
-    setPill($('netPill'), $('netText'), false, '서버 끊김');
+  try{ const s=await (await fetch('/state',{cache:'no-store'})).json(); setPill($('netPill'),$('netText'),true,'서버 연결됨'); render(s); }
+  catch(e){ setPill($('netPill'),$('netText'),false,'서버 끊김'); }
+}
+function setPill(pill,textEl,ok,text){ pill.classList.toggle('ok',!!ok); pill.classList.toggle('bad',!ok); textEl.textContent=text; }
+async function post(path,body){ const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):'{}'}); return r.json(); }
+async function loadConfig(){
+  const c=await (await fetch('/config',{cache:'no-store'})).json();
+  CONFIG=c; LABELS=c.labels||{};
+  const hw=c.hardware||{};
+  setPill($('hwPill'),$('hwText'), hw.button&&hw.camera, (hw.button?'버튼 연결':'버튼 없음')+' · '+(hw.camera?'카메라':'카메라 없음'));
+  PAIR=c.pairing||PAIR; renderPairScreen(); renderCriteriaBar();
+}
+
+function switchScreen(name){ $('screen-scan').classList.toggle('on',name==='scan'); $('screen-pair').classList.toggle('on',name==='pair'); }
+function renderPairScreen(){
+  const paired=PAIR.active;
+  $('pairInputBox').classList.toggle('hide',paired);
+  $('pairedBox').classList.toggle('hide',!paired);
+  $('pairBanner').innerHTML = paired
+    ? '지금 <b>'+esc(PAIR.cart_name||'카트')+'</b> 에 연결되어 있습니다. 쇼핑이 끝나면 아래에서 종료하세요.'
+    : '이 카트는 <b>여러 사람이 함께 쓰는 공용 기기</b>입니다. 연결 정보는 <b>기기에 저장되지 않고</b> 사용 종료 시 지워집니다.';
+  if(paired){
+    $('cartName').textContent=PAIR.cart_name||'연결된 카트';
+    $('pairProfiles').innerHTML=(PAIR.profiles||[]).map(t=>'<span class="chip on">'+esc(labelOf(t))+'</span>').join('')||'<div class="note">앱에서 설정한 기준이 없습니다.</div>';
   }
 }
+function setMsg(text,ok){ const el=$('pairMsg'); el.textContent=text; el.className='msg '+(ok?'ok':'err'); }
 
-function setPill(pill, textEl, ok, text){
-  pill.classList.toggle('ok', !!ok);
-  pill.classList.toggle('bad', !ok);
-  textEl.textContent = text;
-}
-
-async function post(path, body){
-  const r = await fetch(path, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: body ? JSON.stringify(body) : '{}',
-  });
-  return r.json();
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   5. 설정 화면
-   ═══════════════════════════════════════════════════════════════════ */
-function switchScreen(name){
-  $('screen-scan').classList.toggle('on', name === 'scan');
-  $('screen-prefs').classList.toggle('on', name === 'prefs');
-}
-
-async function loadConfig(){
-  const r = await fetch('/config', {cache:'no-store'});
-  CONFIG = await r.json();
-
-  SESSION  = CONFIG.session;
-  selected = new Set(SESSION.active ? SESSION.profiles : []);
-  ocrMode  = (CONFIG.device || {}).ocr_mode || 'mock';
-  $('inName').value = SESSION.display_name || '';
-  $('inMock').value = (CONFIG.device || {}).mock_text || '';
-  $('timeoutMin').textContent = Math.round((CONFIG.session_timeout_sec || 900) / 60);
-
-  const hw = CONFIG.hardware || {};
-  setPill($('hwPill'), $('hwText'), hw.serial && hw.camera,
-          (hw.serial ? '나노 연결' : '나노 없음') + ' · ' +
-          (hw.camera ? '카메라' : '카메라 없음'));
-
-  $('loginBox').classList.toggle('hide', !!SESSION.logged_in);
-  $('logoutBox').classList.toggle('hide', !SESSION.logged_in);
-  $('loggedEmail').textContent = SESSION.email || '';
-
-  $('sessionBanner').innerHTML = SESSION.active
-    ? '지금 <b>' + esc(SESSION.display_name || '사용자') + '</b> 님의 기준이 적용돼 있습니다. '
-      + '쇼핑이 끝나면 아래 <b>사용 종료</b>를 눌러 주세요.'
-    : '이 카트는 <b>여러 사람이 함께 쓰는 공용 기기</b>입니다. '
-      + '여기서 고른 기준은 <b>기기에 저장되지 않고</b> 이번 쇼핑이 끝나면 지워집니다.';
-
-  buildBaseCards(); buildTabs(); buildBundles();
-  renderChips(); renderOcrSeg(); renderCriteriaBar(); applySession(SESSION);
-}
-
-function buildBaseCards(){
-  $('baseCards').innerHTML = (CONFIG.base_profiles || []).map(p =>
-      '<div class="pcard" data-token="' + p.token + '">'
-    +   '<div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" '
-    +     'stroke-linecap="round" stroke-linejoin="round">'
-    +     (BASE_ICONS[p.token] || '') + '</svg></div>'
-    +   '<div class="tx"><b>' + esc(p.label) + '</b><small>' + esc(p.desc) + '</small></div>'
-    +   '<div class="chk"></div></div>').join('');
-  $('baseCards').querySelectorAll('.pcard').forEach(el => {
-    el.addEventListener('click', () => { toggle(el.dataset.token); syncBaseCards(); });
-  });
-  syncBaseCards();
-}
-function syncBaseCards(){
-  $('baseCards').querySelectorAll('.pcard').forEach(el => {
-    el.classList.toggle('sel', selected.has(el.dataset.token));
-  });
-}
-
-function buildTabs(){
-  $('catTabs').innerHTML = (CONFIG.categories || []).map(c =>
-    '<button class="tab' + (c === category ? ' on' : '') + '" data-cat="' + esc(c) + '">'
-    + esc(c) + '</button>').join('');
-  $('catTabs').querySelectorAll('.tab').forEach(el => {
-    el.addEventListener('click', () => { category = el.dataset.cat; buildTabs(); renderChips(); });
-  });
-}
-
-function buildBundles(){
-  $('bundleRow').innerHTML = (CONFIG.bundles || []).map((b, i) =>
-    '<button class="bundle" data-i="' + i + '">＋ ' + esc(b.label) + '</button>').join('');
-  $('bundleRow').querySelectorAll('.bundle').forEach(el => {
-    el.addEventListener('click', () => {
-      const b = CONFIG.bundles[+el.dataset.i];
-      const allOn = b.tokens.every(t => selected.has(t));   // 다 켜져 있으면 다 끈다
-      b.tokens.forEach(t => allOn ? selected.delete(t) : selected.add(t));
-      renderChips();
-    });
-  });
-}
-
-function renderChips(){
-  const q = search.trim().toLowerCase();
-  const list = (CONFIG.choices || []).filter(c => {
-    const okCat = category === '전체' || c.category === category;
-    const okQ = !q || c.label.toLowerCase().includes(q)
-                   || (c.search || '').toLowerCase().includes(q);
-    return okCat && okQ;
-  });
-  $('algChips').innerHTML = list.length
-    ? list.map(c => '<button class="chip' + (selected.has(c.token) ? ' on' : '')
-              + '" data-token="' + c.token + '">' + esc(c.label) + '</button>').join('')
-    : '<div class="note">검색 결과가 없습니다.</div>';
-  $('algChips').querySelectorAll('.chip').forEach(el => {
-    el.addEventListener('click', () => { toggle(el.dataset.token); renderChips(); });
-  });
-  $('algCount').textContent =
-    [...selected].filter(t => t.startsWith('allergy:')).length + '개';
-}
-
-function toggle(token){
-  selected.has(token) ? selected.delete(token) : selected.add(token);
-}
-
-function renderOcrSeg(){
-  $('ocrSeg').querySelectorAll('button').forEach(b => {
-    b.classList.toggle('on', b.dataset.mode === ocrMode);
-  });
-  $('mockField').classList.toggle('hide', ocrMode !== 'mock');
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   6. 이벤트
-   ═══════════════════════════════════════════════════════════════════ */
-$('btnPrefs').addEventListener('click', () => { switchScreen('prefs'); loadConfig(); });
-$('btnBack').addEventListener('click',  () => switchScreen('scan'));
-$('btnAgain').addEventListener('click', () => post('/dismiss'));
-$('btnRetry').addEventListener('click', () => post('/dismiss'));
-$('btnGoSetup').addEventListener('click', async () => {
-  await post('/dismiss'); switchScreen('prefs'); loadConfig();
+$('btnPair').addEventListener('click',()=>{ switchScreen('pair'); loadConfig(); });
+$('btnGoPair').addEventListener('click',()=>{ switchScreen('pair'); loadConfig(); });
+$('btnBack').addEventListener('click',()=>switchScreen('scan'));
+$('btnAgain').addEventListener('click',()=>post('/dismiss'));
+$('btnRetry').addEventListener('click',()=>post('/dismiss'));
+$('btnCapture').addEventListener('click',()=>post('/shoot'));         /* 미리보기에서 촬영 = 두 번째 누름 */
+$('btnCancelPreview').addEventListener('click',()=>post('/dismiss')); /* 미리보기 취소 → 대기 */
+$('cartPill').addEventListener('click',async()=>{ if(!PAIR.active){ switchScreen('pair'); loadConfig(); return; } if(confirm('사용을 종료하고 카트 연결을 끊을까요?')) await endPair(); });
+$('btnEndPair').addEventListener('click',async()=>{ if(confirm('사용을 종료하고 카트 연결을 끊을까요?')) await endPair(); });
+async function endPair(){ await post('/session/end'); await loadConfig(); setMsg('사용을 종료했습니다. 카트 연결이 끊겼습니다.',true); setTimeout(()=>switchScreen('scan'),900); }
+$('btnPairSubmit').addEventListener('click',async()=>{
+  const code=$('inCode').value.trim();
+  if(!code){ setMsg('연결 코드를 입력해 주세요.',false); return; }
+  setMsg('연결 중…',true);
+  const res=await post('/pair',{code});
+  if(res.ok){ PAIR=res.pairing; $('inCode').value=''; renderPairScreen(); renderCriteriaBar(); setMsg('연결되었습니다. 이제 라벨을 스캔할 수 있어요.',true); setTimeout(()=>switchScreen('scan'),900); }
+  else setMsg(res.error||'연결에 실패했습니다.',false);
 });
+$('inCode').addEventListener('keydown',(e)=>{ if(e.key==='Enter') $('btnPairSubmit').click(); });
+$('btnToggleDetail').addEventListener('click',async()=>{ showDetail=!showDetail; renderResult(await (await fetch('/state',{cache:'no-store'})).json()); });
+let lastKeep=0;
+document.addEventListener('pointerdown',()=>{ const now=Date.now(); if(PAIR.active && now-lastKeep>20000){ lastKeep=now; post('/keepalive'); } });
+document.addEventListener('keydown',(e)=>{ if(e.key==='s'||e.key==='S'||e.code==='Space') post('/shoot'); });
+$('v-idle').addEventListener('dblclick',()=>post('/shoot'));
+function esc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-/* ★ 상단 배지를 눌러도 사용 종료 */
-$('sessionPill').addEventListener('click', async () => {
-  if(!SESSION.active) { switchScreen('prefs'); loadConfig(); return; }
-  if(confirm('사용을 종료하고 내 기준을 지울까요?')) await endSession();
-});
-$('btnEndSession').addEventListener('click', async () => {
-  if(confirm('사용을 종료하고 내 기준을 지울까요?')) await endSession();
-});
-
-async function endSession(){
-  await post('/session/end');
-  selected = new Set();
-  $('inName').value = ''; $('inEmail').value = ''; $('inPw').value = '';
-  await loadConfig();
-  setMsg('사용을 종료했습니다. 기준과 로그인 정보가 지워졌습니다.', true);
-  setTimeout(() => switchScreen('scan'), 900);
-}
-
-$('btnToggleDetail').addEventListener('click', async () => {
-  showDetail = !showDetail;
-  const s = await (await fetch('/state', {cache:'no-store'})).json();
-  renderResult(s);
-});
-
-$('inSearch').addEventListener('input', (e) => { search = e.target.value; renderChips(); });
-
-$('ocrSeg').querySelectorAll('button').forEach(b => {
-  b.addEventListener('click', () => { ocrMode = b.dataset.mode; renderOcrSeg(); });
-});
-
-$('btnSave').addEventListener('click', async () => {
-  const res = await post('/settings', {
-    profiles: [...selected],
-    display_name: $('inName').value,
-    ocr_mode: ocrMode,
-    mock_text: $('inMock').value,
-  });
-  if(res.ok){
-    SESSION = res.session; applySession(SESSION); renderCriteriaBar();
-    setMsg(selected.size ? '이 기준으로 검사합니다.'
-                         : '기준을 비웠습니다. 기준이 없으면 판정하지 않습니다.', true);
-    setTimeout(() => switchScreen('scan'), 700);
-  }else setMsg('저장에 실패했습니다.', false);
-});
-
-$('btnLogin').addEventListener('click', async () => {
-  setMsg('로그인 중…', true);
-  const res = await post('/login', {email:$('inEmail').value, password:$('inPw').value});
-  if(res.ok){ setMsg('계정의 기준을 이번 쇼핑에 적용했습니다.', true); await loadConfig(); }
-  else setMsg(res.error || '로그인에 실패했습니다.', false);
-});
-
-$('btnLogout').addEventListener('click', () => endSession());
-
-function setMsg(text, ok){
-  const el = $('prefMsg');
-  el.textContent = text;
-  el.className = 'msg ' + (ok ? 'ok' : 'err');
-}
-
-/* 화면을 만지고 있는 동안은 세션이 만료되지 않도록 알린다(최대 20초에 한 번) */
-let lastKeep = 0;
-document.addEventListener('pointerdown', () => {
-  const now = Date.now();
-  if(SESSION.active && now - lastKeep > 20000){ lastKeep = now; post('/keepalive'); }
-});
-
-/* 개발 편의: 물리 버튼 없이 스캔 시작 (키보드 S / 스페이스, 대기화면 더블탭) */
-document.addEventListener('keydown', (e) => {
-  if(e.key === 's' || e.key === 'S' || e.code === 'Space') post('/shoot');
-});
-$('v-idle').addEventListener('dblclick', () => post('/shoot'));
-
-/* HTML 삽입 시 태그로 해석되지 않도록 특수문자를 바꿔 준다(XSS 방지) */
-function esc(v){
-  return String(v == null ? '' : v)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   7. 시작
-   ═══════════════════════════════════════════════════════════════════ */
-loadConfig().catch(() => setPill($('netPill'), $('netText'), false, '서버 끊김'));
-poll();
-setInterval(poll, 400);
+loadConfig().catch(()=>setPill($('netPill'),$('netText'),false,'서버 끊김'));
+poll(); setInterval(poll,400);
 </script>
 </body>
 </html>

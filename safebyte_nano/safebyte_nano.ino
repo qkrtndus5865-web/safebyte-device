@@ -16,17 +16,20 @@
 
 // ── 함수 원형(미리 선언) ──
 void handleButton();
+void handlePowerButton();
 void handleSerial();
 void handleLightTimeout();
 void handleBuzzer();
 void lightOn();
 void lightOff();
 void startBuzzer();
+void updatePowerLED();
 
 // ── 핀 배정 ──
-const uint8_t PIN_BUTTON = 7;    // 값 7  : 방수 푸시버튼이 꽂힌 핀 번호
-const uint8_t PIN_PIXELS = 6;    // 값 6  : 네오픽셀 링 DIN이 꽂힌 핀 번호
-const uint8_t PIN_BUZZER = 8;    // 값 8  : 액티브 부저(+)가 꽂힌 핀 번호
+const uint8_t PIN_BUTTON = 7;         // 값 7  : 촬영 푸시버튼이 꽂힌 핀 번호
+const uint8_t PIN_PIXELS = 6;         // 값 6  : 네오픽셀 링 DIN이 꽂힌 핀 번호
+const uint8_t PIN_BUZZER = 8;         // 값 8  : 액티브 부저(+)가 꽂힌 핀 번호
+const uint8_t PIN_POWER_BUTTON = 5;   // 값 5  : AL6-A 토글 버튼이 꽂힌 핀 번호 (모니터링용)
 
 // ── 네오픽셀 설정 ──
 const uint8_t NUM_PIXELS = 12;   // 값 12 : 링에 달린 LED 알 개수(실제 부품 수로 수정)
@@ -49,11 +52,19 @@ bool buzzerOn = false;                 // 값 false: 지금 부저가 울리는 
 unsigned long buzzerStartTime = 0;     // 값 0   : 부저를 켠 시각(ms)
 const unsigned long BUZZER_MS = 600;   // 값 600 : 부저를 울릴 시간 길이(ms) = 0.6초
 
+// ── AL6-A 토글 버튼(모니터링용) ──
+int lastPowerReading = HIGH;           // 값 HIGH: 직전 loop에서 읽은 전원버튼 raw 신호
+int powerButtonState = HIGH;           // 값 HIGH: 디바운스 거쳐 확정된 전원버튼 상태
+unsigned long lastPowerDebounceTime = 0;  // 값 0 : 전원버튼 신호가 마지막으로 바뀐 시각(ms)
+bool powerOn = false;                  // 값 false: 지금 전원이 켜져 있는지 여부 (화면 표시용)
+
 void setup() {
   Serial.begin(9600);                  // 값 9600: Pi와 주고받는 통신 속도(보드레이트)
   pinMode(PIN_BUTTON, INPUT_PULLUP);   // 7번 핀: 내부 풀업 입력(안 누르면 HIGH, 누르면 LOW)
   pinMode(PIN_BUZZER, OUTPUT);         // 8번 핀: 출력
   digitalWrite(PIN_BUZZER, LOW);       // 부저 처음엔 꺼둠
+
+  pinMode(PIN_POWER_BUTTON, INPUT_PULLUP);  // 5번 핀: AL6-A 버튼 입력 (모니터링)
 
   pixels.begin();                      // 네오픽셀 초기화
   pixels.clear();                      // 색 버퍼를 전부 0(꺼짐)으로
@@ -61,8 +72,9 @@ void setup() {
 }
 
 void loop() {
-  handleButton();        // 버튼 눌림 감지 → 조명 켜고 SHOOT 전송
-  handleSerial();        // Pi가 보낸 DONE / DANGER 처리
+  handleButton();        // 촬영 버튼 눌림 감지 → 조명 켜고 SHOOT 전송
+  handlePowerButton();   // 전원 토글 버튼 감지 → 릴레이 제어
+  handleSerial();        // Pi가 보낸 DONE / DANGER / POWER 처리
   handleLightTimeout();  // DONE이 안 와도 일정 시간 지나면 조명 자동 끔
   handleBuzzer();        // 부저 자동 끄기(논블로킹)
 }
@@ -138,4 +150,23 @@ void handleBuzzer() {
     digitalWrite(PIN_BUZZER, LOW); // 부저 OFF
     buzzerOn = false;
   }
+}
+
+// ── 전원 토글 버튼: AL6-A 버튼 상태 모니터링 (화면 표시용) ──
+void handlePowerButton() {
+  int reading = digitalRead(PIN_POWER_BUTTON);  // reading : 지금 이 순간 버튼 핀 값
+
+  if (reading != lastPowerReading) {
+    lastPowerDebounceTime = millis();           // 신호가 흔들린 시각 갱신
+  }
+
+  if (millis() - lastPowerDebounceTime > DEBOUNCE_MS) {  // 40ms 넘게 안정됐으면
+    if (reading != powerButtonState) {
+      powerButtonState = reading;               // 확정 상태 갱신
+      // ponytail: 버튼은 직접 전원을 제어함. 아두이노는 상태만 읽어 화면에 표시
+      powerOn = (powerButtonState == LOW);      // LOW = 버튼 눌림 = 전원 켜짐
+      Serial.println(powerOn ? "POWER_ON" : "POWER_OFF");   // Pi에 상태 전송 (화면 표시용)
+    }
+  }
+  lastPowerReading = reading;                   // 다음 비교를 위해 저장
 }
