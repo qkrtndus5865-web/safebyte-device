@@ -220,8 +220,12 @@ def device_redeem(code):
     return True
 
 
-def dev_self_pair():
+def dev_self_pair(profiles=None):
     """[현장 테스트용] 앱 없이 이 기기가 스스로 카트를 만들고 페어링한다.
+
+    기준은 보통 dev_account.json 의 profiles 를 쓴다. 다른 기준으로 한 번만
+    시험해 보고 싶으면 profiles 를 실어 보내면 된다(파일 수정·재시작 불필요):
+        curl -X POST localhost:8080/pair/dev -d '{"profiles":["allergy:peanut"]}'
 
     정식 흐름은 '앱이 카트를 만들고 연결 코드를 발급 → 기기에 코드 입력' 이다.
     앱이 아직 없어 혼자 현장 테스트를 할 때만 쓰라고, 같은 폴더에
@@ -245,7 +249,7 @@ def dev_self_pair():
 
     status, raw = _send(BACKEND_URL + "/api/v1/carts", "POST",
                         _json_body({"name": conf.get("cart_name", "현장 테스트 카트"),
-                                    "profiles": conf.get("profiles", []),
+                                    "profiles": list(profiles or []) or conf.get("profiles", []),
                                     "language": "ko"}), auth)
     payload = _decode(raw)
     if status < 200 or status >= 300:
@@ -711,8 +715,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json(200, {"ok": False, "error": str(exc)})
 
         elif path == "/pair/dev":               # [현장 테스트용] 앱 없이 스스로 페어링
+            payload = self._read_json()
             try:
-                dev_self_pair()
+                dev_self_pair(payload.get("profiles"))
                 reset_state()
                 self._json(200, {"ok": True, "pairing": pairing_snapshot()})
             except Exception as exc:
