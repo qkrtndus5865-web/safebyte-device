@@ -74,6 +74,7 @@ LABELS = {
 }
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEV_ACCOUNT_FILE = os.path.join(SCRIPT_DIR, "dev_account.json")   # 있으면 "현장 테스트 연결" 버튼이 열린다
 
 
 def label_of(token):
@@ -217,6 +218,48 @@ def device_redeem(code):
     log("페어링 성공 → 기기 토큰 발급")
     device_session()                       # cart 기준(profiles) 채우기
     return True
+
+
+def dev_self_pair():
+    """[현장 테스트용] 앱 없이 이 기기가 스스로 카트를 만들고 페어링한다.
+
+    정식 흐름은 '앱이 카트를 만들고 연결 코드를 발급 → 기기에 코드 입력' 이다.
+    앱이 아직 없어 혼자 현장 테스트를 할 때만 쓰라고, 같은 폴더에
+    dev_account.json (계정·기준) 이 있을 때만 동작한다. 파일이 없으면 화면에
+    버튼 자체가 나오지 않는다.
+    """
+    try:
+        with open(DEV_ACCOUNT_FILE, encoding="utf-8") as f:
+            conf = json.load(f)
+    except FileNotFoundError:
+        raise RuntimeError("dev_account.json 이 없어 현장 테스트 연결이 꺼져 있습니다.")
+
+    status, raw = _send(BACKEND_URL + "/api/v1/auth/login", "POST",
+                        _json_body({"email": conf["email"], "password": conf["password"]}),
+                        {"Content-Type": "application/json"})
+    payload = _decode(raw)
+    if status < 200 or status >= 300:
+        raise RuntimeError("로그인 실패: " + _error_message(payload, status))
+    user_token = payload.get("token")
+    auth = {"Content-Type": "application/json", "Authorization": "Bearer " + user_token}
+
+    status, raw = _send(BACKEND_URL + "/api/v1/carts", "POST",
+                        _json_body({"name": conf.get("cart_name", "현장 테스트 카트"),
+                                    "profiles": conf.get("profiles", []),
+                                    "language": "ko"}), auth)
+    payload = _decode(raw)
+    if status < 200 or status >= 300:
+        raise RuntimeError("카트 생성 실패: " + _error_message(payload, status))
+    cart_id = payload.get("cart_id") or payload.get("id")
+
+    status, raw = _send(BACKEND_URL + "/api/v1/carts/%s/pair" % cart_id, "POST", None,
+                        {"Authorization": "Bearer " + user_token})
+    payload = _decode(raw)
+    if status < 200 or status >= 300:
+        raise RuntimeError("연결 코드 발급 실패: " + _error_message(payload, status))
+
+    log("현장 테스트 연결: 카트 생성 → 코드 발급 → 스스로 페어링")
+    return device_redeem(payload.get("code"))
 
 
 def device_session():
@@ -615,6 +658,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "labels": LABELS,
                 "hardware": {"button": bool(BUTTON), "camera": HAS_CAMERA},
                 "backend": BACKEND_URL,
+                "dev_pair": os.path.exists(DEV_ACCOUNT_FILE),
             })
 
         elif path == "/health":
@@ -661,6 +705,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return
             try:
                 device_redeem(code)
+                reset_state()
+                self._json(200, {"ok": True, "pairing": pairing_snapshot()})
+            except Exception as exc:
+                self._json(200, {"ok": False, "error": str(exc)})
+
+        elif path == "/pair/dev":               # [현장 테스트용] 앱 없이 스스로 페어링
+            try:
+                dev_self_pair()
                 reset_state()
                 self._json(200, {"ok": True, "pairing": pairing_snapshot()})
             except Exception as exc:

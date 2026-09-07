@@ -350,6 +350,7 @@ body{
         <div id="pairInputBox">
           <div class="field"><label>연결 코드</label><input id="inCode" type="text" placeholder="앱에서 받은 코드를 입력" autocomplete="off"></div>
           <button class="btn accent" id="btnPairSubmit" style="width:100%">연결하기</button>
+          <button class="btn ghost hide" id="btnDevPair" style="width:100%; margin-top:9px">앱 없이 바로 연결 (현장 테스트)</button>
           <div class="note">연결 코드는 앱에서 발급하며 5분간만 유효합니다. 이 기기에는 비밀번호가 저장되지 않고, 사용을 종료하면 연결이 즉시 끊깁니다.</div>
         </div>
         <div id="pairedBox" class="hide">
@@ -457,6 +458,7 @@ async function loadConfig(){
   CONFIG=c; LABELS=c.labels||{};
   const hw=c.hardware||{};
   setPill($('hwPill'),$('hwText'), hw.button&&hw.camera, (hw.button?'버튼 연결':'버튼 없음')+' · '+(hw.camera?'카메라':'카메라 없음'));
+  $('btnDevPair').classList.toggle('hide', !c.dev_pair);
   PAIR=c.pairing||PAIR; renderPairScreen(); renderCriteriaBar();
 }
 
@@ -490,9 +492,15 @@ $('btnPairSubmit').addEventListener('click',async()=>{
   if(!code){ setMsg('연결 코드를 입력해 주세요.',false); return; }
   setMsg('연결 중…',true);
   const res=await post('/pair',{code});
-  if(res.ok){ PAIR=res.pairing; $('inCode').value=''; renderPairScreen(); renderCriteriaBar(); setMsg('연결되었습니다. 이제 라벨을 스캔할 수 있어요.',true); setTimeout(()=>switchScreen('scan'),900); }
-  else setMsg(res.error||'연결에 실패했습니다.',false);
+  afterPair(res);
 });
+function afterPair(res){
+  if(!res.ok){ setMsg(res.error||'연결에 실패했습니다.',false); return; }
+  PAIR=res.pairing; $('inCode').value=''; renderPairScreen(); renderCriteriaBar();
+  setMsg('연결되었습니다. 이제 라벨을 스캔할 수 있어요.',true); setTimeout(()=>switchScreen('scan'),900);
+}
+/* 앱이 아직 없어 혼자 현장 테스트할 때만 — 파이에 dev_account.json 이 있을 때만 보인다 */
+$('btnDevPair').addEventListener('click',async()=>{ setMsg('앱 없이 연결하는 중…',true); afterPair(await post('/pair/dev')); });
 $('inCode').addEventListener('keydown',(e)=>{ if(e.key==='Enter') $('btnPairSubmit').click(); });
 $('btnToggleDetail').addEventListener('click',async()=>{ showDetail=!showDetail; renderResult(await (await fetch('/state',{cache:'no-store'})).json()); });
 let lastKeep=0;
