@@ -265,9 +265,17 @@ body{
   <div class="topbar">
     <div class="wordmark">Safe<b>·</b>Byte</div>
     <div class="spacer"></div>
+    <div class="pill hide" id="recPill" style="background:var(--danger-soft); border-color:var(--danger); color:var(--danger)">
+      <span class="led" style="background:var(--danger)"></span><span id="recText">0:00</span>
+    </div>
     <div class="pill guest" id="cartPill">연결 안 됨</div>
     <div class="pill" id="hwPill"><span class="led"></span><span id="hwText">확인 중</span></div>
     <div class="pill" id="netPill"><span class="led"></span><span id="netText">서버</span></div>
+    <div class="icon-btn hide" id="btnRec" title="화면 녹화">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/>
+      </svg>
+    </div>
     <div class="icon-btn" id="btnPair" title="카트 연결">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
            stroke-linecap="round" stroke-linejoin="round">
@@ -412,8 +420,18 @@ function renderResult(s){
   $('btnToggleDetail').textContent = showDetail?'간단히 보기':'세부 설명 보기';
 }
 
+function applyRecording(r){
+  if(!r) return;
+  const pill=$('recPill'), btn=$('btnRec');
+  pill.classList.toggle('hide', !r.on);
+  btn.style.color = r.on ? 'var(--danger)' : '';
+  btn.style.borderColor = r.on ? 'var(--danger)' : '';
+  if(r.on){ const m=Math.floor(r.sec/60), sec=String(r.sec%60).padStart(2,'0'); $('recText').textContent=m+':'+sec; }
+}
+
 function render(s){
   applyPairing(s.pairing);
+  applyRecording(s.recording);
   if(s.version===lastVersion) return;
   lastVersion=s.version; showDetail=false;
   if(s.status==='CAPTURING'||s.status==='ANALYZING'){ $('busyTitle').textContent=s.status==='CAPTURING'?'촬영 중':'분석 중'; $('busySub').textContent=s.status==='CAPTURING'?'라벨을 찍고 있어요':'성분을 확인하고 있어요'; }
@@ -459,6 +477,7 @@ async function loadConfig(){
   const hw=c.hardware||{};
   setPill($('hwPill'),$('hwText'), hw.button&&hw.camera, (hw.button?'버튼 연결':'버튼 없음')+' · '+(hw.camera?'카메라':'카메라 없음'));
   $('btnDevPair').classList.toggle('hide', !c.dev_pair);
+  $('btnRec').classList.toggle('hide', !c.recorder);   /* wf-recorder 있을 때만 녹화 버튼 */
   PAIR=c.pairing||PAIR; renderPairScreen(); renderCriteriaBar();
 }
 
@@ -480,6 +499,8 @@ function setMsg(text,ok){ const el=$('pairMsg'); el.textContent=text; el.classNa
 $('btnPair').addEventListener('click',()=>{ switchScreen('pair'); loadConfig(); });
 $('btnGoPair').addEventListener('click',()=>{ switchScreen('pair'); loadConfig(); });
 $('btnBack').addEventListener('click',()=>switchScreen('scan'));
+/* 화면 녹화 토글 — 매장에서 UI 동작을 그대로 남기기 위한 버튼 */
+$('btnRec').addEventListener('click',async()=>{ const r=await post('/record/toggle'); if(r.ok) applyRecording(r.recording); });
 $('btnAgain').addEventListener('click',()=>post('/dismiss'));
 $('btnRetry').addEventListener('click',()=>post('/dismiss'));
 $('btnCapture').addEventListener('click',()=>post('/shoot'));         /* 미리보기에서 촬영 = 두 번째 누름 */

@@ -39,6 +39,9 @@ import os
 import json
 import time
 import uuid
+import shutil
+import signal
+import subprocess
 import threading
 import http.server
 import urllib.error
@@ -75,6 +78,19 @@ LABELS = {
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEV_ACCOUNT_FILE = os.path.join(SCRIPT_DIR, "dev_account.json")   # 있으면 "현장 테스트 연결" 버튼이 열린다
+# 카메라를 이 한 모드로 계속 열어 두고 촬영·미리보기를 모두 여기서 꺼낸다.
+# 센서 최대는 4608×2592 이지만, 촬영 순간 그 모드로 '전환'하는 재설정에서 전류가 크게
+# 튀어 보조배터리가 약하면 파이가 꺼졌다. 2304×1296 은 센서가 화소를 묶어 읽는 모드라
+# 평균 전류도 낮고, 모드 전환이 없으니 순간 피크도 생기지 않는다.
+# 전원이 넉넉해지면 (3456, 1944) 이나 (4608, 2592) 로 올려 판독률을 되찾을 수 있다.
+STILL_SIZE = (2304, 1296)
+PREVIEW_SIZE = (1024, 576)         # 미리보기용 가벼운 스트림(lores)
+RECORD_DIR = os.path.join(SCRIPT_DIR, "recordings")               # 화면 녹화 파일이 쌓이는 곳
+# 파이5는 하드웨어 H.264 인코더가 없어 CPU로 인코딩한다. 녹화 중에 촬영까지 겹치면
+# 순간 소비가 커져 전원이 약할 때 파이가 꺼졌다 → 프레임과 화질을 낮춰 부담을 줄인다.
+RECORD_FPS = 8
+RECORD_CRF = 32                    # 숫자가 클수록 가볍고 화질은 낮다(화면 녹화라 글자는 읽힌다)
+RECORD_MAX_SEC = 30 * 60           # 끄는 걸 깜빡해도 30분에서 스스로 멈춘다(디스크 보호)
 
 
 def label_of(token):
@@ -317,6 +333,114 @@ def pairing_watchdog():
 
 
 # ═════════════════════════════════════════════════════════════════════════
+# 4-2. 화면 녹화 — 매장에서 UI 동작을 그대로 남기기 위한 기능
+#
+#   폰으로 화면을 찍으면 반사·모아레가 생겨 UI가 지저분하게 나온다. 그래서
+#   wf-recorder 로 화면 출력을 직접 파일에 담는다. 파이5는 하드웨어 H.264
+#   인코더가 없어 CPU 로 인코딩하므로, 프레임을 낮추고 필요할 때만 켠다.
+# ═════════════════════════════════════════════════════════════════════════
+recorder = {"proc": None, "path": None, "started": 0.0}
+recorder_lock = threading.Lock()
+
+
+def recorder_available():
+    """wf-recorder 가 설치되어 있을 때만 화면에 녹화 버튼을 띄운다."""
+    return shutil.which("wf-recorder") is not None
+
+
+def recorder_snapshot():
+    with recorder_lock:
+        proc, path, started = recorder["proc"], recorder["path"], recorder["started"]
+    live = proc is not None and proc.poll() is None
+    return {
+        "on": live,
+        "file": os.path.basename(path) if (live and path) else "",
+        "sec": int(time.time() - started) if live else 0,
+    }
+
+
+def record_start():
+    with recorder_lock:
+        if recorder["proc"] is not None and recorder["proc"].poll() is None:
+            return recorder["path"]
+        os.makedirs(RECORD_DIR, exist_ok=True)
+        path = os.path.join(RECORD_DIR, time.strftime("ui_%Y%m%d_%H%M%S.mp4"))
+        env = dict(os.environ)
+        env.setdefault("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
+        env.setdefault("WAYLAND_DISPLAY", "wayland-0")
+        cmd = ["wf-recorder", "-f", path, "-r", str(RECORD_FPS),
+               "-c", "libx264", "-p", "preset=ultrafast", "-p", f"crf={RECORD_CRF}",
+               "-p", "tune=zerolatency", "-p", "threads=2"]   # 인코딩 스레드를 묶어 CPU 폭주 방지
+        recorder.update(proc=subprocess.Popen(cmd, env=env,
+                                              stdin=subprocess.DEVNULL,
+                                              stdout=subprocess.DEVNULL,
+                                              stderr=subprocess.DEVNULL),
+                        path=path, started=time.time())
+    log(f"화면 녹화 시작 → {os.path.basename(path)}")
+    return path
+
+
+def record_stop():
+    """SIGINT 로 멈춰야 wf-recorder 가 파일을 정상적으로 마무리한다(kill 하면 깨진다)."""
+    with recorder_lock:
+        proc, path = recorder["proc"], recorder["path"]
+        recorder.update(proc=None, path=None, started=0.0)
+    if proc is None or proc.poll() is not None:
+        return None
+    try:
+        proc.send_signal(signal.SIGINT)
+        proc.wait(timeout=10)
+    except Exception:
+        proc.kill()
+    size = os.path.getsize(path) / 1e6 if path and os.path.exists(path) else 0
+    log(f"화면 녹화 정지 → {os.path.basename(path or '')} ({size:.1f}MB)")
+    return path
+
+
+def recorder_hold():
+    """촬영 순간에만 녹화를 잠시 멈춘다(전류 피크 완화).
+
+    wf-recorder 에는 일시정지 기능이 없어 프로세스를 SIGSTOP 으로 재운다.
+    파일은 그대로 이어지고, 멈춘 동안의 몇 프레임만 빠진다.
+    """
+    with recorder_lock:
+        proc = recorder["proc"]
+    if proc is not None and proc.poll() is None:
+        try:
+            proc.send_signal(signal.SIGSTOP)
+            return proc
+        except Exception:
+            pass
+    return None
+
+
+def recorder_release(proc):
+    if proc is not None:
+        try:
+            proc.send_signal(signal.SIGCONT)
+        except Exception:
+            pass
+
+
+def record_toggle():
+    if recorder_snapshot()["on"]:
+        record_stop()
+    else:
+        record_start()
+    return recorder_snapshot()
+
+
+def recorder_watchdog():
+    """끄는 걸 깜빡해도 일정 시간이 지나면 스스로 멈춘다 — SD카드가 가득 차는 것을 막는다."""
+    while True:
+        time.sleep(30)
+        snap = recorder_snapshot()
+        if snap["on"] and snap["sec"] > RECORD_MAX_SEC:
+            log("녹화 시간이 한도를 넘어 자동 정지합니다")
+            record_stop()
+
+
+# ═════════════════════════════════════════════════════════════════════════
 # 5. 공유 상태 — 화면이 /state 로 읽어가는 현재 상황
 # ═════════════════════════════════════════════════════════════════════════
 IDLE_STATE = {
@@ -383,9 +507,13 @@ def start_camera():
         return
     try:
         CAMERA = Picamera2()
-        # 미리보기 해상도를 조금 높여(1640x1232) 라벨 글자 판독에 유리하게.
+        # ★ 스트림을 두 개로 열어 두고 '모드 전환 없이' 쓴다.
+        #   main  : 촬영용(분석 이미지)     lores : 미리보기용(가벼움)
+        #   예전에는 촬영 순간 스틸 모드로 전환했는데, 그 재설정 때 전류가 크게 튀어
+        #   보조배터리가 약하면 파이가 꺼졌다. 처음부터 한 모드로 고정해 스파이크를 없앤다.
         CAMERA.configure(CAMERA.create_video_configuration(
-            main={"size": (1640, 1232), "format": "RGB888"}))
+            main={"size": STILL_SIZE, "format": "RGB888"},
+            lores={"size": PREVIEW_SIZE, "format": "YUV420"}))
         CAMERA.start()
         # ★ imx708(카메라 모듈 3)은 오토포커스 지원 → 연속 초점(근거리 라벨에 맞춤).
         #   AfSpeed=Fast 로 라벨을 대면 빠르게 초점을 잡게 한다.
@@ -400,7 +528,8 @@ def start_camera():
         except Exception as exc:
             log("오토포커스 설정 실패(고정 초점으로 진행):", exc)
         time.sleep(0.8)
-        log("카메라 미리보기 시작 (1640x1232)")
+        log(f"카메라 시작 — 촬영 {STILL_SIZE[0]}x{STILL_SIZE[1]}, "
+            f"미리보기 {PREVIEW_SIZE[0]}x{PREVIEW_SIZE[1]} (모드 전환 없음)")
     except Exception as exc:
         log("카메라 시작 실패:", exc)
         CAMERA = None
@@ -425,15 +554,25 @@ def _mock_frame():
 
 
 def frame_jpeg(quality=80):
-    """카메라의 현재 프레임을 JPEG 바이트로. 카메라가 없으면 목 이미지."""
+    """미리보기 프레임을 JPEG 로. 가벼운 lores 스트림에서 꺼내 촬영 스트림을 건드리지 않는다.
+
+    lores 는 YUV420 이라 그대로는 색 이미지가 안 된다. cv2 가 있으면 색으로 바꾸고,
+    없으면 밝기(Y) 평면만 써서 흑백으로 보여준다. 라벨 조준에는 흑백으로도 충분하다.
+    """
     if CAMERA is None:
         return _mock_frame()
     try:
         from PIL import Image
         with _cam_lock:
-            arr = CAMERA.capture_array()
+            arr = CAMERA.capture_array("lores")
+        try:
+            import cv2
+            rgb = cv2.cvtColor(arr, cv2.COLOR_YUV2RGB_I420)
+            img = Image.fromarray(rgb)
+        except Exception:
+            img = Image.fromarray(arr[:PREVIEW_SIZE[1], :PREVIEW_SIZE[0]], mode="L")
         buf = io.BytesIO()
-        Image.fromarray(arr).save(buf, format="JPEG", quality=quality)
+        img.save(buf, format="JPEG", quality=quality)
         return buf.getvalue()
     except Exception as exc:
         log("프레임 캡처 실패:", exc)
@@ -445,6 +584,7 @@ def capture_image():
     촬영 직전 오토포커스를 한 번 더 확실히 맞춘 뒤, 미리보기보다 높은 해상도로 찍는다."""
     if CAMERA is None:
         return _mock_frame()
+    held = recorder_hold()          # 녹화 중이면 촬영하는 동안만 멈춘다
     try:
         from PIL import Image
         # 촬영 직전 초점 재확보(매크로 근접). 실패해도 연속 초점값으로 진행.
@@ -454,15 +594,17 @@ def capture_image():
             time.sleep(0.7)
         except Exception:
             pass
-        still_config = CAMERA.create_still_configuration()
+        # ★ 모드 전환 없이 main 스트림에서 그대로 꺼낸다(전류 스파이크 제거).
         with _cam_lock:
-            arr = CAMERA.switch_mode_and_capture_array(still_config, "main")
+            arr = CAMERA.capture_array("main")
         buf = io.BytesIO()
-        Image.fromarray(arr).save(buf, format="JPEG", quality=92)
+        Image.fromarray(arr).save(buf, format="JPEG", quality=90)
         return buf.getvalue()
     except Exception as exc:
         log("고화질 촬영 실패 → 미리보기 프레임으로 대체:", exc)
         return frame_jpeg(quality=90)
+    finally:
+        recorder_release(held)
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -653,6 +795,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with state_lock:
                 snap = dict(state)
             snap["pairing"] = pairing_snapshot()
+            snap["recording"] = recorder_snapshot()
             self._json(200, snap)
 
         elif path == "/config":
@@ -663,6 +806,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "hardware": {"button": bool(BUTTON), "camera": HAS_CAMERA},
                 "backend": BACKEND_URL,
                 "dev_pair": os.path.exists(DEV_ACCOUNT_FILE),
+                "recorder": recorder_available(),
             })
 
         elif path == "/health":
@@ -734,6 +878,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             touch_pairing()
             self._json(200, {"ok": True, "pairing": pairing_snapshot()})
 
+        elif path == "/record/toggle":          # 화면 녹화 시작/정지 (매장 시연 기록용)
+            if not recorder_available():
+                self._json(200, {"ok": False, "error": "wf-recorder 가 설치되어 있지 않습니다."})
+                return
+            try:
+                self._json(200, {"ok": True, "recording": record_toggle()})
+            except Exception as exc:
+                self._json(200, {"ok": False, "error": str(exc)})
+
         elif path == "/session/end":            # ★ 사용 종료 — 기기 토큰 즉시 폐기
             clear_pairing("버튼")
             self._json(200, {"ok": True, "pairing": pairing_snapshot()})
@@ -756,6 +909,7 @@ def main():
     log(f"공용정책  페어링 없이 시작(연결 전 스캔 안 함) / 자동 만료 {IDLE_TIMEOUT_SEC // 60}분")
 
     threading.Thread(target=pairing_watchdog, daemon=True).start()
+    threading.Thread(target=recorder_watchdog, daemon=True).start()
 
     server = http.server.ThreadingHTTPServer(("0.0.0.0", UI_PORT), Handler)
     log(f"화면 서버 시작 → http://localhost:{UI_PORT}")
